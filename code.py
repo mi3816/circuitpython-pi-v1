@@ -25,13 +25,13 @@ psk = os.getenv('psk')
 pool = socketpool.SocketPool(wifi.radio)
 
 # Initialize BMP180 sensor
-i2c = busio.I2C(sda=board.GP0,scl=board.GP1,frequency=100000)
-bmp = bmp180.BMP180(i2c)
-bmp.mode = bmp180.MODE_HIGHRES
+#i2c = busio.I2C(sda=board.GP0,scl=board.GP1,frequency=100000)
+#bmp = bmp180.BMP180(i2c)
+#bmp.mode = bmp180.MODE_HIGHRES
 
 # Global variables for storing temperature and pressure readings
-bmp180_temperature = None
-bmp180_pressure = None
+max6675_1_temperature = None
+max6675_2_temperature = None
 
 # Load InfluxDB details from settings.toml
 INFLUXDB_URL_BASE = os.getenv('INFLUXDB_URL')
@@ -65,15 +65,20 @@ def log_to_syslog(level, message):
 
 # Read the BMP180
 async def read_bmp180():
-    global bmp180_temperature
-    global bmp180_pressure
+    global max6675_1_temperature
+    global max6675_2_temperature
 
     while True:
         try:
-            bmp180_temperature = bmp.temperature
-            bmp180_pressure = bmp.pressure
+            temp1 = thermocouple1.read()
+            temp1F = celsius_to_fahrenheit(temp1)
+            max6675_1_temperature = temp1F
+            temp2 = thermocouple2.read()
+            temp2F = celsius_to_fahrenheit(temp2)
+            max6675_2_temperature = temp2F
+            #bmp180_pressure = bmp.pressure
             #print(f"Temperature: {bmp180_temperature} C, Pressure: {bmp180_pressure} hPa")
-            log_to_syslog(usyslog.S_INFO, f"Temperature: {bmp180_temperature} C, Pressure: {bmp180_pressure} hPa")
+            log_to_syslog(usyslog.S_INFO, f"Temperature1: {max6675_1_temperature} F, Temperature: {max6675_2_temperature} F")
         except RuntimeError as error:
             #print("BMP180 sensor error:", error.args[0])
             log_to_syslog(usyslog.S_ERR, "BMP180 sensor error:" + error.args[0])
@@ -115,8 +120,8 @@ async def ntp_time_sync():
 
 # Send data to InfluxDB v2 server
 async def send_data_to_influxdb():
-    global bmp180_temperature
-    global bmp180_pressure
+    global max6675_1_temperature
+    global max6675_2_temperature
 
     while not wifi.radio.connected:
         await asyncio.sleep(1)
@@ -125,8 +130,8 @@ async def send_data_to_influxdb():
     http_session = requests.Session(pool, ssl_context)
 
     while True:
-        if bmp180_temperature is not None and bmp180_pressure is not None:
-            data = f"temperature,device=bmp180 value={bmp180_temperature}\npressure,device=bmp180 value={bmp180_pressure}"
+        if max6675_1_temperature is not None and max6675_2_temperature is not None:
+            data = f"temperature1,device=temp1 value={max6675_1_temperature}\temperature2,device=temp2 value={max6675_2_temperature}"
             try:
                 response = http_session.post(INFLUXDB_URL, headers=HEADERS, data=data)
                 if response.status_code == 204:
