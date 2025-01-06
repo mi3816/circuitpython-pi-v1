@@ -16,6 +16,37 @@ import busio
 import adafruit_requests as requests
 import ssl
 import usyslog
+from max6675 import MAX6675
+from busio import I2C
+from lcd_api import LcdApi
+from i2c_lcd import I2cLcd
+
+sck1 = board.GP2
+cs1 = board.GP3
+so1 = board.GP4
+
+sck2 = board.GP6
+cs2 = board.GP7
+so2 = board.GP8
+
+thermocouple1 = MAX6675(sck1, cs1, so1)
+temp1 = thermocouple1.read()
+print(temp1)
+
+thermocouple2 = MAX6675(sck2, cs2, so2)
+temp2 = thermocouple2.read()
+print(temp2)
+
+I2C_ADDR     = 0x27
+I2C_NUM_ROWS = 2
+I2C_NUM_COLS = 16
+
+i2c = I2C(sda=board.GP0, scl=board.GP1, frequency=400000)
+lcd = I2cLcd(i2c, I2C_ADDR, I2C_NUM_ROWS, I2C_NUM_COLS)
+
+def celsius_to_fahrenheit(temp_celsius): 
+    temp_fahrenheit = temp_celsius * (9/5) + 32 
+    return temp_fahrenheit
 
 # Load WiFi credentials from settings.toml
 ssid = os.getenv('ssid')
